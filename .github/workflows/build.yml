@@ -2,36 +2,148 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
+    name: Build Debug APK
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v6
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
+      # 2. Setup JDK 17
+      - name: Setup JDK 17
+        uses: actions/setup-java@v5
         with:
+          distribution: temurin
           java-version: '17'
-          distribution: 'temurin'
+          cache: gradle
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
+      # 3. Setup Gradle 8.10.2
+      #    Used only when generating the wrapper if gradlew is missing.
+      #    This also avoids the Gradle 9.x/KSP issue you encountered.
+      - name: Setup Gradle 8.10.2
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.10.2'
 
-      - name: Generate Keystore & Google Services
+      # 4. Generate Gradle Wrapper if missing
+      - name: Generate Gradle Wrapper
+        shell: bash
         run: |
-          keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          if [ ! -f app/google-services.json ]; then
-            echo '{"project_info":{"project_number":"0","project_id":"dummy"},"client":[{"client_info":{"mobilesdk_app_id":"1:0:android:0","android_client_info":{"package_name":"com.example.app"}},"api_key":[{"current_key":"dummy"}]}]}' > app/google-services.json
+          set -e
+
+          if [ ! -f "./gradlew" ]; then
+            echo "gradlew not found. Generating Gradle Wrapper..."
+
+            gradle wrapper \
+              --gradle-version 8.10.2 \
+              --distribution-type bin
+          else
+            echo "gradlew already exists. Using existing wrapper."
           fi
 
-      - name: Build APK with Gradle
-        run: gradle assembleDebug --no-daemon
+          chmod +x ./gradlew
 
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+          echo "Gradle wrapper:"
+          ./gradlew --version
+
+      # 5. Create root debug.keystore
+      - name: Create debug keystore
+        shell: bash
+        run: |
+          set -e
+
+          if [ ! -f "./debug.keystore" ]; then
+            echo "debug.keystore not found. Generating temporary debug keystore..."
+
+            keytool \
+              -genkeypair \
+              -v \
+              -keystore ./debug.keystore \
+              -storepass android \
+              -keypass android \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -dname "CN=Android Debug,O=Android,C=US"
+          else
+            echo "debug.keystore already exists."
+          fi
+
+          test -f ./debug.keystore
+          echo "debug.keystore created successfully."
+
+      # 6. Create matching google-services.json
+      - name: Create google-services.json
+        shell: bash
+        run: |
+          set -e
+
+          mkdir -p app
+
+          cat > app/google-services.json <<'EOF'
+          {
+            "project_info": {
+              "project_number": "000000000000",
+              "project_id": "taher-service-studio-ci",
+              "storage_bucket": "taher-service-studio-ci.appspot.com"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "1:000000000000:android:0000000000000000",
+                  "android_client_info": {
+                    "package_name": "com.aistudio.taherservicestudio.zqvmkl"
+                  }
+                }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+
+          echo "Generated app/google-services.json"
+          cat app/google-services.json
+
+      # 7. Build Debug APK
+      - name: Build Debug APK
+        shell: bash
+        run: |
+          set -e
+
+          chmod +x ./gradlew
+
+          ./gradlew \
+            assembleDebug \
+            --no-daemon \
+            --stacktrace
+
+      # 8. Verify APK exists
+      - name: Verify APK
+        shell: bash
+        run: |
+          set -e
+
+          echo "Generated APK files:"
+          find app/build/outputs/apk/debug -maxdepth 1 -type f -name "*.apk" -print
+
+          test -n "$(find app/build/outputs/apk/debug -maxdepth 1 -type f -name "*.apk" -print -quit)"
+
+      # 9. Upload APK artifact
+      - name: Upload Debug APK
+        uses: actions/upload-artifact@v7
         with:
-          name: service-studio-app
+          name: service-studio-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
