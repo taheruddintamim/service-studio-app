@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="blueGrad" x1="80" y1="80" x2="420" y2="440" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#00B4FF" />
+      <stop offset="50%" stop-color="#0084FF" />
+      <stop offset="100%" stop-color="#0062FF" />
+    </linearGradient>
+  </defs>
+
+  <g stroke="url(#blueGrad)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Left vertical 't' -->
+    <line x1="72" y1="168" x2="182" y2="168" />
+    <path d="M 128 104 L 128 388 A 42 42 0 0 0 196 426 L 198 426" />
+
+    <!-- Top-Right angled slope with crossbar -->
+    <path d="M 148 78 A 42 42 0 0 1 194 44 L 372 196 A 42 42 0 0 1 414 240" />
+    <line x1="316" y1="250" x2="408" y2="158" />
+
+    <!-- Bottom angled slope with crossbar -->
+    <path d="M 414 264 L 418 300 A 42 42 0 0 1 388 348 L 204 438" />
+    <line x1="228" y1="346" x2="298" y2="466" />
+  </g>
+</svg>
